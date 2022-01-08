@@ -1,4 +1,4 @@
-module github.com/AkihiroSuda/go-list-func
+module github.com/tony2001/go-list-func
 
 go 1.14
 

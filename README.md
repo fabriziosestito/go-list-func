@@ -1,6 +1,8 @@
 # go-list-func
 
-go-list-func list up the list of functions in the package. WIP.
+go-list-func list up the list of functions in the package.
+
+This package is a fork of [go-list-func](github.com/AkihiroSuda/go-list-func) reworked as a library with some additions.
 
 ## Example
 
@@ -58,9 +60,22 @@ go-list-func list up the list of functions in the package. WIP.
     Usage of go-list-func
       -include-tests
             include tests
+      -private
+            also print non-exported funcs
       -tags string
             build tags
       -verbose
             verbose
-    exit status 2
-    
+
+## API
+```go
+// loads packages data for later usage
+LoadProgram(tags, args []string, includeTests bool) (*loader.Program, error)
+
+// runs applyFunc for every function declaration in the package(s)
+WalkFuncsInProgram(prog *loader.Program, applyFunc func(decl *ast.FuncDecl) error) error
+
+// checks if the function/method is exported
+IsExported(decl *ast.FuncDecl) bool
+
+```
