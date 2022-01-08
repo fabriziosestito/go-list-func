@@ -1,5 +1,7 @@
 # go-list-func
 
+![Build Status](https://github.com/tony2001/go-list-func/workflows/Go/badge.svg)
+
 go-list-func list up the list of functions in the package.
 
 This package is a fork of [go-list-func](github.com/AkihiroSuda/go-list-func) reworked as a library with some additions.
