@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"go/ast"
 	"os"
-	"strings"
 
 	"github.com/tony2001/go-list-func"
+	"golang.org/x/tools/go/packages"
 )
 
 func main() {
 	var (
 		buildTags    string
 		private      bool
+		printPackage bool
 		includeTests bool
 		verbose      bool
 	)
@@ -21,41 +22,36 @@ func main() {
 	flag.StringVar(&buildTags, "tags", "", "build tags")
 	flag.BoolVar(&includeTests, "include-tests", false, "include tests")
 	flag.BoolVar(&private, "private", false, "also print non-exported funcs")
+	flag.BoolVar(&printPackage, "print-package", false, "print package name for each function")
 	flag.BoolVar(&verbose, "verbose", false, "verbose")
 	flag.Parse()
 
-	prog, err := list.LoadProgram(parseBuildTags(buildTags), flag.Args(), includeTests)
+	pkgs, err := list.LoadPackages(flag.Args())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprintf(os.Stderr, "LoadPackages(): %v\n", err)
 		os.Exit(1)
 	}
 
-	applyFunc := func(decl *ast.FuncDecl) error {
-		return printFuncDecl(decl, verbose, private)
+	applyFunc := func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error {
+		pkgName := ""
+		if printPackage {
+			pkgName = pkg.Name
+		}
+		return printFuncDecl(pkgName, decl, verbose, private)
 	}
 
-	if err = list.WalkFuncsInProgram(prog, applyFunc); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if err = list.WalkFuncs(pkgs, applyFunc); err != nil {
+		fmt.Fprintf(os.Stderr, "WalkFuncs(): %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func parseBuildTags(tags string) []string {
-	var result []string
-	split := strings.Split(tags, ",")
-	for _, s := range split {
-		result = append(result, strings.TrimSpace(s))
-	}
-
-	return result
-}
-
-func printFuncDecl(decl *ast.FuncDecl, verbose, private bool) error {
+func printFuncDecl(pkgName string, decl *ast.FuncDecl, verbose, private bool) error {
 	if private || list.IsExported(decl) {
 		if verbose {
-			fmt.Println(formatFuncDecl(decl))
+			fmt.Println(list.FormatFuncDeclVerbose(pkgName, decl))
 		} else {
-			fmt.Println(decl.Name.Name)
+			fmt.Println(list.FormatFuncDecl(pkgName, decl))
 		}
 	}
 

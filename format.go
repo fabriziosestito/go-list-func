@@ -1,4 +1,4 @@
-package main
+package list
 
 import (
 	"fmt"
@@ -28,6 +28,8 @@ func formatType(typ ast.Expr) string {
 		panic(fmt.Errorf("unsupported chan type %#v", t))
 	case *ast.BasicLit:
 		return t.Value
+	case *ast.InterfaceType:
+		return "interface {}"
 	default:
 		panic(fmt.Errorf("unsupported type %#v", t))
 	}
@@ -72,17 +74,28 @@ func formatFuncResults(fields *ast.FieldList) string {
 	return s
 }
 
-func formatFuncDecl(decl *ast.FuncDecl) string {
-	s := "func "
+func FormatFuncDecl(pkgName string, decl *ast.FuncDecl) string {
+	if pkgName != "" {
+		return fmt.Sprintf("%s.%s", pkgName, decl.Name.Name)
+	}
+	return decl.Name.Name
+}
+
+func FormatFuncDeclVerbose(pkgName string, decl *ast.FuncDecl) string {
+	s := ""
+	if pkgName != "" {
+		s += fmt.Sprintf("%s: func ", pkgName)
+	} else {
+		s += "func "
+	}
+
 	if decl.Recv != nil {
 		if len(decl.Recv.List) != 1 {
 			panic(fmt.Errorf("strange receiver for %s: %#v", decl.Name.Name, decl.Recv))
 		}
+
 		field := decl.Recv.List[0]
-		if len(field.Names) == 0 {
-			// function definition in interface (ignore)
-			return ""
-		} else if len(field.Names) != 1 {
+		if len(field.Names) != 1 {
 			panic(fmt.Errorf("strange receiver field for %s: %#v", decl.Name.Name, field))
 		}
 		s += fmt.Sprintf("(%s %s) ", field.Names[0], formatType(field.Type))

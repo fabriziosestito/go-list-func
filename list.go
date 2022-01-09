@@ -3,42 +3,38 @@ package list
 import (
 	"fmt"
 	"go/ast"
-	"go/build"
 	"unicode"
 
-	"golang.org/x/tools/go/loader"
+	"golang.org/x/tools/go/packages"
 )
 
-func LoadProgram(tags, args []string, includeTests bool) (*loader.Program, error) {
-	var conf loader.Config
-	conf.Build = &build.Default
-	conf.Build.BuildTags = append(conf.Build.BuildTags, tags...)
+func LoadPackages(patterns []string) ([]*packages.Package, error) {
+	var cfg packages.Config
+	cfg.Mode |= packages.NeedName
+	cfg.Mode |= packages.NeedSyntax
 
-	_, err := conf.FromArgs(args, includeTests)
-	if err != nil {
-		return nil, err
-	}
-
-	prog, err := conf.Load()
-	return prog, err
+	return packages.Load(&cfg, patterns...)
 }
 
-func WalkFuncsInProgram(prog *loader.Program, applyFunc func(decl *ast.FuncDecl) error) error {
-	for _, pkgInfo := range prog.InitialPackages() {
-		for _, file := range pkgInfo.Files {
+func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error) error {
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Syntax {
 			for _, xdecl := range file.Decls {
 				decl, ok := xdecl.(*ast.FuncDecl)
 				if !ok {
 					continue
 				}
 
-				if err := applyFunc(decl); err != nil {
+				if isInterfaceDecl(decl) {
+					continue
+				}
+
+				if err := applyFunc(pkg, file, decl); err != nil {
 					return err
 				}
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -53,6 +49,21 @@ func IsExported(decl *ast.FuncDecl) bool {
 	}
 
 	return isUpper0(decl.Name.Name)
+}
+
+// check if it's an interface method declaration
+func isInterfaceDecl(decl *ast.FuncDecl) bool {
+	if decl.Recv != nil {
+		if len(decl.Recv.List) != 1 {
+			panic(fmt.Errorf("strange receiver for %s: %#v", decl.Name.Name, decl.Recv))
+		}
+
+		field := decl.Recv.List[0]
+		if len(field.Names) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // get the name of the receiver struct

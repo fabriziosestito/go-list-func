@@ -69,15 +69,23 @@ This package is a fork of [go-list-func](github.com/AkihiroSuda/go-list-func) re
       -verbose
             verbose
 
+Example:
+	$ go-list-func ./...
+
 ## API
 ```go
 // loads packages data for later usage
-LoadProgram(tags, args []string, includeTests bool) (*loader.Program, error)
+LoadPackages(patterns []string ([]*packages.Program, error)
 
 // runs applyFunc for every function declaration in the package(s)
-WalkFuncsInProgram(prog *loader.Program, applyFunc func(decl *ast.FuncDecl) error) error
+WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error) error
 
 // checks if the function/method is exported
 IsExported(decl *ast.FuncDecl) bool
 
+// format func declaration (short version)
+FormatFuncDecl(pkgName string, decl *ast.FuncDecl) string
+
+// format func declaration (verbose version)
+FormatFuncDeclVerbose(pkgName string, decl *ast.FuncDecl) string
 ```
