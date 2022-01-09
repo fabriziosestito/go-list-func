@@ -62,10 +62,10 @@ This package is a fork of [go-list-func](github.com/AkihiroSuda/go-list-func) re
     Usage of go-list-func
       -include-tests
             include tests
+      -print-package
+            print package name for each function
       -private
             also print non-exported funcs
-      -tags string
-            build tags
       -verbose
             verbose
 
@@ -75,7 +75,7 @@ Example:
 ## API
 ```go
 // loads packages data for later usage
-LoadPackages(patterns []string ([]*packages.Program, error)
+LoadPackages(patterns []string, includeTests bool) ([]*packages.Program, error)
 
 // runs applyFunc for every function declaration in the package(s)
 WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error) error

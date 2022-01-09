@@ -12,21 +12,19 @@ import (
 
 func main() {
 	var (
-		buildTags    string
 		private      bool
 		printPackage bool
 		includeTests bool
 		verbose      bool
 	)
 
-	flag.StringVar(&buildTags, "tags", "", "build tags")
 	flag.BoolVar(&includeTests, "include-tests", false, "include tests")
 	flag.BoolVar(&private, "private", false, "also print non-exported funcs")
 	flag.BoolVar(&printPackage, "print-package", false, "print package name for each function")
 	flag.BoolVar(&verbose, "verbose", false, "verbose")
 	flag.Parse()
 
-	pkgs, err := list.LoadPackages(flag.Args())
+	pkgs, err := list.LoadPackages(flag.Args(), includeTests)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "LoadPackages(): %v\n", err)
 		os.Exit(1)

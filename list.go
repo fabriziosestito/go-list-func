@@ -8,10 +8,11 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-func LoadPackages(patterns []string) ([]*packages.Package, error) {
+func LoadPackages(patterns []string, includeTests bool) ([]*packages.Package, error) {
 	var cfg packages.Config
 	cfg.Mode |= packages.NeedName
 	cfg.Mode |= packages.NeedSyntax
+	cfg.Tests = includeTests
 
 	return packages.Load(&cfg, patterns...)
 }
