@@ -57,17 +57,19 @@ This package is a fork of [go-list-func](github.com/AkihiroSuda/go-list-func) re
 	...
 
 ## CLI
-
-    $ go-list-func -help
-    Usage of go-list-func
-      -include-tests
-            include tests
-      -print-package
-            print package name for each function
-      -private
-            also print non-exported funcs
-      -verbose
-            verbose
+```
+Usage of ./go-list-func:
+  -include-generated
+        include generated files
+  -include-tests
+        include tests
+  -print-package
+        print package name for each function
+  -private
+        also print non-exported funcs
+  -verbose
+        verbose
+```
 
 Example:
 ```
