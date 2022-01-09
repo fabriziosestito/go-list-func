@@ -14,7 +14,24 @@ func LoadPackages(patterns []string, includeTests bool) ([]*packages.Package, er
 	cfg.Mode |= packages.NeedSyntax
 	cfg.Tests = includeTests
 
-	return packages.Load(&cfg, patterns...)
+	pkgs, err := packages.Load(&cfg, patterns...)
+	if err != nil {
+		return nil, err
+	}
+
+	// packages.Load() returns a weird GRAPH-IN-ARRAY which means in can contain duplicates
+	pkgMap := make(map[string]*packages.Package, len(pkgs))
+	for _, pkg := range pkgs {
+		pkgPath := pkg.PkgPath
+		pkgMap[pkgPath] = pkg
+	}
+
+	pkgs = make([]*packages.Package, 0, len(pkgMap))
+	for _, pkg := range pkgMap {
+		pkgs = append(pkgs, pkg)
+	}
+
+	return pkgs, nil
 }
 
 func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error) error {

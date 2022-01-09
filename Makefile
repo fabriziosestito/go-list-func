@@ -1,4 +1,4 @@
-.PHONY: test install ci-tests ci-linter
+.PHONY: test install ci-tests ci-linter go-list-func
 
 GOPATH_DIR=`go env GOPATH`
 
