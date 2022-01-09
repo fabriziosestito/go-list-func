@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 )
 
 func formatType(typ ast.Expr) string {
@@ -24,8 +25,15 @@ func formatType(typ ast.Expr) string {
 	case *ast.MapType:
 		return fmt.Sprintf("map[%s]%s", formatType(t.Key), formatType(t.Value))
 	case *ast.ChanType:
-		// FIXME
-		panic(fmt.Errorf("unsupported chan type %#v", t))
+		s := "chan"
+		if t.Arrow != token.NoPos {
+			if t.Begin == token.NoPos {
+				s = "<- chan"
+			} else {
+				s = "chan <-"
+			}
+		}
+		return fmt.Sprintf("%s %s", s, formatType(t.Value))
 	case *ast.BasicLit:
 		return t.Value
 	case *ast.InterfaceType:
