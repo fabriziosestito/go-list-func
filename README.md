@@ -70,7 +70,23 @@ This package is a fork of [go-list-func](github.com/AkihiroSuda/go-list-func) re
             verbose
 
 Example:
-	$ go-list-func ./...
+```
+$ ./go-list-func -verbose -private ./...
+func formatType(typ ast.Expr) string
+func formatFields(fields *ast.FieldList) string
+func formatFuncParams(fields *ast.FieldList) string
+func formatFuncResults(fields *ast.FieldList) string
+func FormatFuncDecl(pkgName string, decl *ast.FuncDecl) string
+func FormatFuncDeclVerbose(pkgName string, decl *ast.FuncDecl) string
+func LoadPackages(patterns []string, includeTests bool) ([]*packages.Package, error)
+func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error) error
+func IsExported(decl *ast.FuncDecl) bool
+func isInterfaceDecl(decl *ast.FuncDecl) bool
+func getRecvName(decl *ast.FuncDecl) string
+func main()
+func printFuncDecl(pkgName string, decl *ast.FuncDecl, verbose, private bool) error
+
+```
 
 ## API
 ```go
