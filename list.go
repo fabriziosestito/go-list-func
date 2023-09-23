@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"unicode"
 
 	"golang.org/x/tools/go/packages"
@@ -34,8 +35,18 @@ func LoadPackages(patterns []string, includeTests bool) ([]*packages.Package, er
 	return pkgs, nil
 }
 
+type A []string
+
 func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error) error {
+
 	for _, pkg := range pkgs {
+		imported, err := importer.Default().Import(pkg.Types.Path())
+		if err != nil {
+			panic(err)
+		}
+		for _, declName := range imported.Scope().Names() {
+			fmt.Println(declName)
+		}
 		for _, file := range pkg.Syntax {
 			for _, xdecl := range file.Decls {
 				decl, ok := xdecl.(*ast.FuncDecl)
@@ -44,6 +55,7 @@ func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, f
 				}
 
 				if isInterfaceDecl(decl) {
+					fmt.Println("interface")
 					continue
 				}
 
