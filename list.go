@@ -31,7 +31,7 @@ func LoadPackages(patterns []string, includeTests bool) ([]*packages.Package, er
 	for _, pkg := range pkgMap {
 		pkgs = append(pkgs, pkg)
 	}
-
+	// fmt.Printf("%v", pkgs)
 	return pkgs, nil
 }
 
@@ -64,8 +64,14 @@ func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, f
 			return err
 		}
 
+		_, err = f.WriteString("type Embedme interface{}\n\n")
+		if err != nil {
+			return (err)
+		}
+
 		for _, file := range pkg.Syntax {
-			// printTypes(file)
+
+			generateTypes(f, file)
 			for _, xdecl := range file.Decls {
 				decl, ok := xdecl.(*ast.FuncDecl)
 				if !ok {
@@ -76,32 +82,38 @@ func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, f
 					continue
 				}
 
-				recv := ""
-				if decl.Recv != nil {
-					if len(decl.Recv.List) != 1 {
-						panic(fmt.Errorf("strange receiver for %s: %#v", decl.Name.Name, decl.Recv))
-					}
+				// recv := ""
+				// if decl.Recv != nil {
+				// 	if len(decl.Recv.List) != 1 {
+				// 		panic(fmt.Errorf("strange receiver for %s: %#v", decl.Name.Name, decl.Recv))
+				// 	}
 
-					field := decl.Recv.List[0]
-					if len(field.Names) != 1 {
-						panic(fmt.Errorf("strange receiver field for %s: %#v", decl.Name.Name, field))
-					}
-					recv = fmt.Sprintf("(%s).", formatType(field.Type))
-				}
+				// 	field := decl.Recv.List[0]
+				// 	if len(field.Names) != 1 {
+				// 		panic(fmt.Errorf("strange receiver field for %s: %#v", decl.Name.Name, field))
+				// 	}
+				// 	recv = fmt.Sprintf("(%s).", formatType(field.Type))
+				// }
 
-				_, err := f.WriteString("//go:linkname stub_" + getRecvName(decl) + decl.Name.Name + " " + pkg.PkgPath + "." + recv + decl.Name.Name + "\n")
+				// _, err := f.WriteString("//go:linkname stub_" + getRecvName(decl) + decl.Name.Name + " " + pkg.PkgPath + "." + recv + decl.Name.Name + "\n")
+				// if err != nil {
+				// 	return err
+				// }
+
+				// _, err = f.WriteString("func stub_" + getRecvName(decl) + decl.Name.Name + "() {\n    panic(\"stub\")\n}\n\n")
+				// if err != nil {
+				// 	return err
+				// }
+
+				foo := FormatFuncDeclVerbose("", decl)
+				foo += " {\n panic(\"stub\")\n}\n\n"
+				_, err := f.WriteString(foo)
 				if err != nil {
 					return err
 				}
-
-				_, err = f.WriteString("func stub_" + getRecvName(decl) + decl.Name.Name + "() {\n    panic(\"stub\")\n}\n\n")
-				if err != nil {
-					return err
-				}
-
-				if err := applyFunc(pkg, file, decl); err != nil {
-					return err
-				}
+				// if err := applyFunc(pkg, file, decl); err != nil {
+				// 	return err
+				// }
 
 			}
 		}
@@ -109,40 +121,49 @@ func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, f
 	return nil
 }
 
-func printTypes(syntax *ast.File) {
+func generateTypes(f *os.File, syntax *ast.File) {
 	for n, o := range syntax.Scope.Objects {
 		// if o.Kind == ast.Typ {
 		// check if type is exported(only need for non-local types)
-		if unicode.IsUpper([]rune(n)[0]) {
-			node := o.Decl
-			switch node.(type) {
-			case *ast.TypeSpec:
-				typeSpec := node.(*ast.TypeSpec)
-				switch typeSpec.Type.(type) {
-				case *ast.StructType:
-					structType := typeSpec.Type.(*ast.StructType)
-					field := formatFields(structType.Fields)
-					println("type " + n + " struct " + "{" + field + "}")
-
-				case *ast.InterfaceType:
-					// n := typeSpec.Type.(*ast.ArrayType)
-					println(n + " is interface")
-
-				default:
-					println("type " + n + " " + formatType(typeSpec.Type))
+		// if unicode.IsUpper([]rune(n)[0]) {
+		node := o.Decl
+		switch node.(type) {
+		case *ast.TypeSpec:
+			typeSpec := node.(*ast.TypeSpec)
+			switch typeSpec.Type.(type) {
+			case *ast.StructType:
+				structType := typeSpec.Type.(*ast.StructType)
+				field := formatFieldsStruct(structType.Fields)
+				_, err := f.WriteString("type " + n + " struct " + "{" + field + "}\n\n")
+				if err != nil {
+					panic(err)
 				}
-			case *ast.ValueSpec:
-				valueSpec := node.(*ast.ValueSpec)
-
-				println("var " + n + " " + formatType(valueSpec.Type))
-
-				for _, value := range valueSpec.Values {
-					println(formatType(value))
+			default:
+				_, err := f.WriteString("type " + n + " " + formatType(typeSpec.Type) + "\n\n")
+				if err != nil {
+					panic(err)
 				}
 			}
-
-			// }
 		}
+		// case *ast.InterfaceType:
+		// 	// n := typeSpec.Type.(*ast.ArrayType)
+		// 	println(n + " is interface")
+
+		// 	default:
+		// 		println("type " + n + " " + formatType(typeSpec.Type))
+		// 	}
+		// case *ast.ValueSpec:
+		// 	valueSpec := node.(*ast.ValueSpec)
+
+		// 	println("var " + n + " " + formatType(valueSpec.Type))
+
+		// 	for _, value := range valueSpec.Values {
+		// 		println(formatType(value))
+		// 	}
+		// }
+
+		// }
+		// }
 	}
 }
 

@@ -39,6 +39,35 @@ func formatType(typ interface{}) string {
 	case *ast.InterfaceType:
 		return "interface {}"
 	default:
+		return ""
+	}
+}
+
+func formatStructType(typ interface{}) string {
+	switch t := typ.(type) {
+	case nil:
+		return ""
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		return "interface{}"
+	case *ast.StarExpr:
+		return "interface{}"
+	case *ast.ArrayType:
+		return "interface{}"
+	case *ast.Ellipsis:
+		return "interface{}"
+	case *ast.FuncType:
+		return "interface{}"
+	case *ast.MapType:
+		return "interface{}"
+	case *ast.ChanType:
+		return "interface{}"
+	case *ast.BasicLit:
+		return t.Value
+	case *ast.InterfaceType:
+		return "interface {}"
+	default:
 		panic(fmt.Errorf("unsupported type %#v", t))
 	}
 }
@@ -53,9 +82,33 @@ func formatFields(fields *ast.FieldList) string {
 			}
 			s += " "
 		}
-		s += formatType(field.Type)
+		s += "interface{}"
 		if i != len(fields.List)-1 {
 			s += ", "
+		}
+	}
+
+	return s
+}
+
+func formatFieldsStruct(fields *ast.FieldList) string {
+	s := ""
+	for i, field := range fields.List {
+		for j, name := range field.Names {
+
+			s += name.Name
+			if j != len(field.Names)-1 {
+				s += ";"
+			}
+			s += " "
+		}
+		if len(field.Names) == 0 {
+			s += "Embedme"
+		} else {
+			s += "interface{}"
+		}
+		if i != len(fields.List)-1 {
+			s += "; "
 		}
 	}
 
