@@ -40,7 +40,7 @@ func main() {
 
 		pkgName := ""
 		if printPackage {
-			pkgName = pkg.Name
+			pkgName = pkg.PkgPath
 		}
 
 		return printFuncDecl(pkgName, decl, verbose, private)

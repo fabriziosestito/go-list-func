@@ -3,7 +3,7 @@ package list
 import (
 	"fmt"
 	"go/ast"
-	"go/importer"
+	"os"
 	"unicode"
 
 	"golang.org/x/tools/go/packages"
@@ -37,17 +37,35 @@ func LoadPackages(patterns []string, includeTests bool) ([]*packages.Package, er
 
 type A []string
 
-func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error) error {
+const B = 1
 
+type C struct {
+	banana A
+	ciao   bool
+}
+
+func (c *C) testMethod() {
+}
+
+func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error) error {
 	for _, pkg := range pkgs {
-		imported, err := importer.Default().Import(pkg.Types.Path())
+		err := os.MkdirAll(pkg.PkgPath, 0755)
 		if err != nil {
-			panic(err)
+			return err
 		}
-		for _, declName := range imported.Scope().Names() {
-			fmt.Println(declName)
+
+		f, err := os.Create(pkg.PkgPath + "/" + pkg.Name + ".go")
+		if err != nil {
+			return err
 		}
+
+		_, err = f.WriteString("package " + pkg.Name + "\n\nimport _ \"unsafe\"\n\n")
+		if err != nil {
+			return err
+		}
+
 		for _, file := range pkg.Syntax {
+			// printTypes(file)
 			for _, xdecl := range file.Decls {
 				decl, ok := xdecl.(*ast.FuncDecl)
 				if !ok {
@@ -55,17 +73,77 @@ func WalkFuncs(pkgs []*packages.Package, applyFunc func(pkg *packages.Package, f
 				}
 
 				if isInterfaceDecl(decl) {
-					fmt.Println("interface")
 					continue
+				}
+
+				recv := ""
+				if decl.Recv != nil {
+					if len(decl.Recv.List) != 1 {
+						panic(fmt.Errorf("strange receiver for %s: %#v", decl.Name.Name, decl.Recv))
+					}
+
+					field := decl.Recv.List[0]
+					if len(field.Names) != 1 {
+						panic(fmt.Errorf("strange receiver field for %s: %#v", decl.Name.Name, field))
+					}
+					recv = fmt.Sprintf("(%s).", formatType(field.Type))
+				}
+
+				_, err := f.WriteString("//go:linkname stub_" + getRecvName(decl) + decl.Name.Name + " " + pkg.PkgPath + "." + recv + decl.Name.Name + "\n")
+				if err != nil {
+					return err
+				}
+
+				_, err = f.WriteString("func stub_" + getRecvName(decl) + decl.Name.Name + "() {\n    panic(\"stub\")\n}\n\n")
+				if err != nil {
+					return err
 				}
 
 				if err := applyFunc(pkg, file, decl); err != nil {
 					return err
 				}
+
 			}
 		}
 	}
 	return nil
+}
+
+func printTypes(syntax *ast.File) {
+	for n, o := range syntax.Scope.Objects {
+		// if o.Kind == ast.Typ {
+		// check if type is exported(only need for non-local types)
+		if unicode.IsUpper([]rune(n)[0]) {
+			node := o.Decl
+			switch node.(type) {
+			case *ast.TypeSpec:
+				typeSpec := node.(*ast.TypeSpec)
+				switch typeSpec.Type.(type) {
+				case *ast.StructType:
+					structType := typeSpec.Type.(*ast.StructType)
+					field := formatFields(structType.Fields)
+					println("type " + n + " struct " + "{" + field + "}")
+
+				case *ast.InterfaceType:
+					// n := typeSpec.Type.(*ast.ArrayType)
+					println(n + " is interface")
+
+				default:
+					println("type " + n + " " + formatType(typeSpec.Type))
+				}
+			case *ast.ValueSpec:
+				valueSpec := node.(*ast.ValueSpec)
+
+				println("var " + n + " " + formatType(valueSpec.Type))
+
+				for _, value := range valueSpec.Values {
+					println(formatType(value))
+				}
+			}
+
+			// }
+		}
+	}
 }
 
 func IsExported(decl *ast.FuncDecl) bool {
@@ -101,6 +179,9 @@ func isInterfaceDecl(decl *ast.FuncDecl) bool {
 // func (b *Bar) testMethod() - Bar
 // func (f foo) testMethod() - foo
 func getRecvName(decl *ast.FuncDecl) string {
+	if decl.Recv == nil {
+		return ""
+	}
 	// some new syntax?
 	if len(decl.Recv.List) != 1 {
 		panic(fmt.Errorf("multiple receivers for %s: %#v", decl.Name.Name, decl.Recv))

@@ -6,7 +6,7 @@ import (
 	"go/token"
 )
 
-func formatType(typ ast.Expr) string {
+func formatType(typ interface{}) string {
 	switch t := typ.(type) {
 	case nil:
 		return ""
