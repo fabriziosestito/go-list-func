@@ -1,4 +1,4 @@
-package list
+package gen
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ func formatType(typ interface{}) string {
 	case *ast.Ellipsis:
 		return formatType(t.Elt)
 	case *ast.FuncType:
-		return fmt.Sprintf("func(%s)%s", formatFuncParams(t.Params), formatFuncResults(t.Results))
+		return fmt.Sprintf("func(%s)%s", formatFields(t.Params), formatFuncResults(t.Results))
 	case *ast.MapType:
 		return fmt.Sprintf("map[%s]%s", formatType(t.Key), formatType(t.Value))
 	case *ast.ChanType:
@@ -43,7 +43,7 @@ func formatType(typ interface{}) string {
 	}
 }
 
-func formatStructType(typ interface{}) string {
+func formatTypeStruct(typ interface{}) string {
 	switch t := typ.(type) {
 	case nil:
 		return ""
@@ -52,23 +52,31 @@ func formatStructType(typ interface{}) string {
 	case *ast.SelectorExpr:
 		return "interface{}"
 	case *ast.StarExpr:
-		return "interface{}"
+		return fmt.Sprintf("*%s", formatTypeStruct(t.X))
 	case *ast.ArrayType:
-		return "interface{}"
+		return fmt.Sprintf("[%s]%s", formatTypeStruct(t.Len), formatTypeStruct(t.Elt))
 	case *ast.Ellipsis:
-		return "interface{}"
+		return formatTypeStruct(t.Elt)
 	case *ast.FuncType:
-		return "interface{}"
+		return fmt.Sprintf("func(%s)%s", formatFields(t.Params), formatFuncResults(t.Results))
 	case *ast.MapType:
-		return "interface{}"
+		return fmt.Sprintf("map[%s]%s", formatTypeStruct(t.Key), formatTypeStruct(t.Value))
 	case *ast.ChanType:
-		return "interface{}"
+		s := "chan"
+		if t.Arrow != token.NoPos {
+			if t.Begin == token.NoPos {
+				s = "<- chan"
+			} else {
+				s = "chan <-"
+			}
+		}
+		return fmt.Sprintf("%s %s", s, formatTypeStruct(t.Value))
 	case *ast.BasicLit:
 		return t.Value
 	case *ast.InterfaceType:
 		return "interface {}"
 	default:
-		panic(fmt.Errorf("unsupported type %#v", t))
+		return ""
 	}
 }
 
@@ -93,6 +101,8 @@ func formatFields(fields *ast.FieldList) string {
 
 func formatFieldsStruct(fields *ast.FieldList) string {
 	s := ""
+	hasAlreadyEmbedded := false
+	hasNamedFields := false
 	for i, field := range fields.List {
 		for j, name := range field.Names {
 
@@ -103,20 +113,21 @@ func formatFieldsStruct(fields *ast.FieldList) string {
 			s += " "
 		}
 		if len(field.Names) == 0 {
-			s += "Embedme"
+			if !hasAlreadyEmbedded {
+				s += "Embedme"
+				hasAlreadyEmbedded = true
+			}
 		} else {
-			s += "interface{}"
+			hasNamedFields = true
+			s += formatTypeStruct(field.Type)
 		}
-		if i != len(fields.List)-1 {
+		if i != len(fields.List)-1 && hasNamedFields {
 			s += "; "
 		}
 	}
 
+	println(s)
 	return s
-}
-
-func formatFuncParams(fields *ast.FieldList) string {
-	return formatFields(fields)
 }
 
 func formatFuncResults(fields *ast.FieldList) string {
@@ -136,13 +147,6 @@ func formatFuncResults(fields *ast.FieldList) string {
 }
 
 func FormatFuncDecl(pkgName string, decl *ast.FuncDecl) string {
-	if pkgName != "" {
-		return fmt.Sprintf("%s.%s", pkgName, decl.Name.Name)
-	}
-	return decl.Name.Name
-}
-
-func FormatFuncDeclVerbose(pkgName string, decl *ast.FuncDecl) string {
 	s := ""
 	if pkgName != "" {
 		s += fmt.Sprintf("%s: func ", pkgName)
@@ -159,10 +163,10 @@ func FormatFuncDeclVerbose(pkgName string, decl *ast.FuncDecl) string {
 		if len(field.Names) != 1 {
 			panic(fmt.Errorf("strange receiver field for %s: %#v", decl.Name.Name, field))
 		}
-		s += fmt.Sprintf("(%s %s) ", field.Names[0], formatType(field.Type))
+		s += fmt.Sprintf("(%s %s) ", field.Names[0], formatTypeStruct(field.Type))
 	}
 
-	s += fmt.Sprintf("%s(%s)", decl.Name.Name, formatFuncParams(decl.Type.Params))
+	s += fmt.Sprintf("%s(%s)", decl.Name.Name, formatFields(decl.Type.Params))
 	s += formatFuncResults(decl.Type.Results)
 
 	return s

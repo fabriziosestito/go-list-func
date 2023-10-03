@@ -1,16 +1,9 @@
-.PHONY: test install ci-tests ci-linter go-list-func
+SOURCE_FILES := $(shell find . -type f -name '*.go')
 
-GOPATH_DIR=`go env GOPATH`
+go-stub-package: $(SOURCE_FILES) go.mod go.sum
+	go build -o go-stub-package ./cmd/go-stub-package
 
-go-list-func:
-	go build -o go-list-func ./cmd/go-list-func
-
-install:
-	go install ./cmd/go-list-func
-
+.PHONY: test
 test:
 	go test -v ./...
 
-ci-linter:
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH_DIR)/bin v1.30.0
-	@$(GOPATH_DIR)/bin/golangci-lint run -v

@@ -1,5 +1,3 @@
-github.com/sigstore/sigstore-go v0.0.0-20230922052723-1125f45143c4 h1:5Y2KUKqOBTcEPfU1edXmc36dhp3qDSlk6+QA1BaXW6Y=
-github.com/sigstore/sigstore-go v0.0.0-20230922052723-1125f45143c4/go.mod h1:eAzM5NGXFLtZeoLuH45sw1vMNY7hWSqUZeZGGBqQI+c=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/mod v0.1.1-0.20191105210325-c90efee705ee h1:WG0RUwxtNT4qqaXX3DPA8zHFNm/D9xaBpxzHt1WcA/E=

@@ -1,8 +1,5 @@
-module github.com/tony2001/go-list-func
+module github.com/fabriziosestito/go-stub-package
 
-go 1.14
+go 1.21
 
-require (
-	github.com/sigstore/sigstore-go v0.0.0-20230922052723-1125f45143c4 // indirect
-	golang.org/x/tools v0.0.0-20200226224502-204d844ad48d
-)
+require golang.org/x/tools v0.0.0-20200226224502-204d844ad48d
