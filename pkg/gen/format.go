@@ -68,7 +68,7 @@ func formatTypeStruct(typ interface{}, importedPackages []string) string {
 	case *ast.ArrayType:
 		return fmt.Sprintf("[%s]%s", formatTypeStruct(t.Len, importedPackages), formatTypeStruct(t.Elt, importedPackages))
 	case *ast.Ellipsis:
-		return formatTypeStruct(t.Elt, importedPackages)
+		return fmt.Sprintf("...%s", formatTypeStruct(t.Elt, importedPackages))
 	case *ast.FuncType:
 		return fmt.Sprintf("func(%s)%s", formatFields(t.Params, importedPackages), formatFuncResults(t.Results, importedPackages))
 	case *ast.MapType:
@@ -155,13 +155,8 @@ func formatFuncResults(fields *ast.FieldList, importedPackages []string) string 
 	return s
 }
 
-func FormatFuncDecl(pkgName string, decl *ast.FuncDecl, importedPackages []string) string {
-	s := ""
-	if pkgName != "" {
-		s += fmt.Sprintf("%s: func ", pkgName)
-	} else {
-		s += "func "
-	}
+func FormatFuncDecl(decl *ast.FuncDecl, importedPackages []string) string {
+	s := "func "
 
 	if decl.Recv != nil {
 		if len(decl.Recv.List) != 1 {

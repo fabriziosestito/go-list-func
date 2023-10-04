@@ -9,8 +9,6 @@ import (
 	"strings"
 	"unicode"
 
-	jijjo "encoding/json"
-
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/imports"
@@ -22,7 +20,6 @@ type Import struct {
 }
 
 func GenerateStubs(patterns []string) error {
-	_ = jijjo.Valid
 	pkgs, err := loadPackages(patterns, false)
 	if err != nil {
 		return err
@@ -75,7 +72,6 @@ func GenerateStubs(patterns []string) error {
 					if err != nil {
 						return err
 					}
-					importedPackagesSet[name] = struct{}{}
 				}
 			}
 		}
@@ -86,9 +82,6 @@ func GenerateStubs(patterns []string) error {
 			importedPackages = append(importedPackages, k)
 		}
 
-		// for _, i := range importedPackages {
-		// 	println("importedPackages: ", i)
-		// }
 		for _, astFile := range pkg.Syntax {
 
 			err = stubTypes(astFile, buf, importedPackages)
@@ -161,7 +154,6 @@ func loadPackages(patterns []string, includeTests bool) ([]*packages.Package, er
 	// packages.Load() returns a weird GRAPH-IN-ARRAY which means in can contain duplicates
 	pkgMap := make(map[string]*packages.Package, len(pkgs))
 	for _, pkg := range pkgs {
-		fmt.Printf("pkg: %s\n", pkg.GoFiles)
 		pkgPath := pkg.PkgPath
 		pkgMap[pkgPath] = pkg
 	}
@@ -188,6 +180,24 @@ func stubTypes(astFile *ast.File, f *bytes.Buffer, importedPackages []string) er
 				structType := typeSpec.Type.(*ast.StructType)
 				field := formatFieldsStruct(structType.Fields, importedPackages)
 				_, err := f.WriteString("type " + n + " struct " + "{" + field + "}\n\n")
+				if err != nil {
+					return err
+				}
+			case *ast.InterfaceType:
+
+				interfaceType := typeSpec.Type.(*ast.InterfaceType)
+
+				i := "type " + n + " interface {\n"
+				for _, method := range interfaceType.Methods.List {
+					m, ok := method.Type.(*ast.FuncType)
+					if !ok {
+						// TODO: handle embedded interfaces
+						continue
+					}
+					i += fmt.Sprintf("%s(%s) %s\n", method.Names[0].Name, formatFields(m.Params, importedPackages), formatFuncResults(m.Results, importedPackages))
+				}
+				i += "}\n\n"
+				_, err := f.WriteString(i)
 				if err != nil {
 					return err
 				}
@@ -220,7 +230,7 @@ func stubFunctions(astFile *ast.File, outFile *bytes.Buffer, importedPackages []
 			continue
 		}
 
-		foo := FormatFuncDecl("", decl, importedPackages)
+		foo := FormatFuncDecl(decl, importedPackages)
 		foo += " {\n panic(\"stub\")\n}\n\n"
 		_, err := outFile.WriteString(foo)
 		if err != nil {
