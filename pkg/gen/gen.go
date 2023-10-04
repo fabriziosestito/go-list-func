@@ -55,18 +55,26 @@ func GenerateStubs(patterns []string) error {
 				}
 
 				if o.Name != nil {
-					// _, err := buf.WriteString("import " + o.Name.Name + " " + o.Path.Value + "\n\n")
-					// if err != nil {
-					// 	return err
-					// }
+					if _, ok := importedPackagesSet[o.Name.Name]; ok {
+						continue
+					}
+
+					_, err := buf.WriteString("import " + o.Name.Name + " " + o.Path.Value + "\n\n")
+					if err != nil {
+						return err
+					}
 					importedPackagesSet[o.Name.Name] = struct{}{}
 				} else {
-					// _, err := buf.WriteString("import " + o.Path.Value + "\n\n")
-					// if err != nil {
-					// 	return err
-					// }
 					name := o.Path.Value[strings.LastIndex(o.Path.Value, "/")+1:]
 					name = strings.ReplaceAll(name, "\"", "")
+					if _, ok := importedPackagesSet[name]; ok {
+						continue
+					}
+
+					_, err := buf.WriteString("import " + o.Path.Value + "\n\n")
+					if err != nil {
+						return err
+					}
 					importedPackagesSet[name] = struct{}{}
 				}
 			}
