@@ -7,55 +7,13 @@ import (
 )
 
 func main() {
-	var (
-		includePrivate   bool
-		includeTests     bool
-		includeGenerated bool
-		verbose          bool
-	)
-
-	flag.BoolVar(&includeTests, "include-tests", false, "include tests")
-	flag.BoolVar(&includeGenerated, "include-generated", false, "include generated files")
-	flag.BoolVar(&includePrivate, "include-private", false, "include non-exported funcs")
-
-	flag.BoolVar(&verbose, "verbose", false, "verbose")
 	flag.Parse()
 
 	err := gen.GenerateStubs(flag.Args())
 	if err != nil {
 		panic(err)
 	}
-
-	// applyFunc := func(pkg *packages.Package, file *ast.File, decl *ast.FuncDecl) error {
-	// 	if !includeGenerated && isGeneratedFile(file) {
-	// 		return nil
-	// 	}
-
-	// 	pkgName := ""
-	// 	if printPackage {
-	// 		pkgName = pkg.PkgPath
-	// 	}
-
-	// 	return printFuncDecl(pkgName, decl, verbose, private)
-	// }
-
-	// if err = list.WalkFuncs(pkgs, applyFunc); err != nil {
-	// 	fmt.Fprintf(os.Stderr, "WalkFuncs(): %v\n", err)
-	// 	os.Exit(1)
-	// }
 }
-
-// func printFuncDecl(pkgName string, decl *ast.FuncDecl, verbose, private bool) error {
-// 	if private || gen.IsExported(decl) {
-// 		if verbose {
-// 			fmt.Println(list.FormatFuncDeclVerbose(pkgName, decl))
-// 		} else {
-// 			fmt.Println(list.FormatFuncDecl(pkgName, decl))
-// 		}
-// 	}
-
-// 	return nil
-// }
 
 // // check if it's a generated file
 // func isGeneratedFile(file *ast.File) bool {

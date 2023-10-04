@@ -64,6 +64,7 @@ func GenerateStubs(patterns []string) error {
 				} else {
 					name := o.Path.Value[strings.LastIndex(o.Path.Value, "/")+1:]
 					name = strings.ReplaceAll(name, "\"", "")
+					println(name)
 					if _, ok := importedPackagesSet[name]; ok {
 						continue
 					}
@@ -72,18 +73,17 @@ func GenerateStubs(patterns []string) error {
 					if err != nil {
 						return err
 					}
+					importedPackagesSet[name] = struct{}{}
 				}
 			}
 		}
 
 		importedPackages := []string{}
-
 		for k := range importedPackagesSet {
 			importedPackages = append(importedPackages, k)
 		}
 
 		for _, astFile := range pkg.Syntax {
-
 			err = stubTypes(astFile, buf, importedPackages)
 			if err != nil {
 				return err
@@ -170,23 +170,18 @@ func stubTypes(astFile *ast.File, f *bytes.Buffer, importedPackages []string) er
 		// check if type is exported(only need for non-local types)
 		// if unicode.IsUpper([]rune(n)[0]) {
 		node := o.Decl
-		switch node.(type) {
+		switch ts := node.(type) {
 		case *ast.TypeSpec:
-			typeSpec := node.(*ast.TypeSpec)
-			switch typeSpec.Type.(type) {
+			switch t := ts.Type.(type) {
 			case *ast.StructType:
-				structType := typeSpec.Type.(*ast.StructType)
-				field := formatFieldsStruct(structType.Fields, importedPackages)
+				field := formatFieldsStruct(t.Fields, importedPackages)
 				_, err := f.WriteString("type " + n + " struct " + "{" + field + "}\n\n")
 				if err != nil {
 					return err
 				}
 			case *ast.InterfaceType:
-
-				interfaceType := typeSpec.Type.(*ast.InterfaceType)
-
 				i := "type " + n + " interface {\n"
-				for _, method := range interfaceType.Methods.List {
+				for _, method := range t.Methods.List {
 					m, ok := method.Type.(*ast.FuncType)
 					if !ok {
 						// TODO: handle embedded interfaces
@@ -200,7 +195,7 @@ func stubTypes(astFile *ast.File, f *bytes.Buffer, importedPackages []string) er
 					return err
 				}
 			default:
-				_, err := f.WriteString("type " + n + " " + formatTypeStruct(typeSpec.Type, importedPackages) + "\n\n")
+				_, err := f.WriteString("type " + n + " " + formatTypeStruct(ts.Type, importedPackages) + "\n\n")
 				if err != nil {
 					return err
 				}
