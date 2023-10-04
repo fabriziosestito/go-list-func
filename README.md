@@ -1,11 +1,11 @@
 # go-stub-package
 
-A simple tool to generate stubs of Go packages.
+A tool to generate stubs of public functions and types from Go packages.
 
 TODO:
 
 - [ ] Programmatically generate `go.mod` file
-- [ ] Use internal packages
-- [ ] Run goimports on generated files
-- [ ] Support ...spread operator
-- [ ] USe go templates to simplify testing (aka gen generates structures that will be used from templates)
+- [x] Use internal packages
+- [x] Run goimports on generated files
+- [x] Support ...spread operator
+- [ ] Testing
