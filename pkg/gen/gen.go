@@ -1,6 +1,7 @@
 package gen
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
 	"os"
@@ -12,7 +13,13 @@ import (
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/imports"
 )
+
+type Import struct {
+	Name string
+	Path string
+}
 
 func GenerateStubs(patterns []string) error {
 	_ = jijjo.Valid
@@ -20,11 +27,11 @@ func GenerateStubs(patterns []string) error {
 	if err != nil {
 		return err
 	}
-	modName, err := getModuleName(".")
+
+	_, err = getModuleName(".")
 	if err != nil {
 		return err
 	}
-	println("mod: ", modName)
 
 	for _, pkg := range pkgs {
 		err := os.MkdirAll(pkg.PkgPath, 0755)
@@ -32,59 +39,98 @@ func GenerateStubs(patterns []string) error {
 			return err
 		}
 
+		buf := bytes.NewBuffer(nil)
+
+		_, err = buf.WriteString("package " + pkg.Name + "\n\n")
+		if err != nil {
+			return err
+		}
+		// Get all the imports from the package and add it to the file
+		// A the end we will programmatically use "goimports" on the generated file to fix the imports
+		importedPackagesSet := make(map[string]struct{})
+		for _, astFile := range pkg.Syntax {
+			for _, o := range astFile.Imports {
+				if isThirdParty(o.Path.Value) && !isLocalImport(o.Path.Value, pkgs) {
+					continue
+				}
+
+				if o.Name != nil {
+					// _, err := buf.WriteString("import " + o.Name.Name + " " + o.Path.Value + "\n\n")
+					// if err != nil {
+					// 	return err
+					// }
+					importedPackagesSet[o.Name.Name] = struct{}{}
+				} else {
+					// _, err := buf.WriteString("import " + o.Path.Value + "\n\n")
+					// if err != nil {
+					// 	return err
+					// }
+					name := o.Path.Value[strings.LastIndex(o.Path.Value, "/")+1:]
+					name = strings.ReplaceAll(name, "\"", "")
+					importedPackagesSet[name] = struct{}{}
+				}
+			}
+		}
+
+		importedPackages := []string{}
+
+		for k := range importedPackagesSet {
+			importedPackages = append(importedPackages, k)
+		}
+
+		// for _, i := range importedPackages {
+		// 	println("importedPackages: ", i)
+		// }
+		for _, astFile := range pkg.Syntax {
+
+			err = stubTypes(astFile, buf, importedPackages)
+			if err != nil {
+				return err
+			}
+
+			err = stubFunctions(astFile, buf, importedPackages)
+			if err != nil {
+				return err
+			}
+
+		}
+
+		_, err = buf.WriteString("type Embedme interface{}\n\n")
+		if err != nil {
+			return (err)
+		}
+
+		// Programmatically use "goimports" on the generated file
+
+		// The file is created before since the imports.Process() function
+		// requires to know the file path.
 		outFile, err := os.Create(pkg.PkgPath + "/" + pkg.Name + ".go")
 		if err != nil {
 			return err
 		}
 
-		_, err = outFile.WriteString("package " + pkg.Name + "\n\n")
+		res, _ := imports.Process(outFile.Name(), buf.Bytes(), nil)
+
+		_, err = outFile.Write(res)
 		if err != nil {
 			return err
-		}
-
-		_, err = outFile.WriteString("type Embedme interface{}\n\n")
-		if err != nil {
-			return (err)
-		}
-
-		for _, astFile := range pkg.Syntax {
-			for _, o := range astFile.Imports {
-				for _, p := range pkgs {
-					// println("p.PkgPath: ", p.PkgPath)
-
-					// println("p.PkgPath: ", o.Path.Value)
-					if "\""+p.PkgPath+"\"" == o.Path.Value || !isThirdParty(o.Path.Value) {
-						if o.Name != nil {
-							println(o.Name.Name)
-						}
-						println(o.Path.Value)
-					}
-				}
-			}
-			err = stubTypes(astFile, outFile)
-			if err != nil {
-				return err
-			}
-
-			err = stubFunctions(astFile, outFile)
-			if err != nil {
-				return err
-			}
 		}
 	}
 
 	return nil
 }
 
+// isThirdParty checks if the given import path is a third party package. (no standard library)
 func isThirdParty(importPath string) bool {
 	// Third party package import path usually contains "." (".com", ".org", ...)
 	// This logic is taken from golang.org/x/tools/imports package.
 	return strings.Contains(importPath, ".")
 }
 
+// isLocalImport checks if the given import path is local to the given packages.
 func isLocalImport(importPath string, pkgs []*packages.Package) bool {
 	for _, pkg := range pkgs {
-		if pkg.PkgPath == importPath {
+		if "\""+pkg.PkgPath+"\"" == importPath {
 			return true
 		}
 	}
@@ -96,6 +142,7 @@ func loadPackages(patterns []string, includeTests bool) ([]*packages.Package, er
 	var cfg packages.Config
 	cfg.Mode |= packages.NeedName
 	cfg.Mode |= packages.NeedSyntax
+	cfg.Mode |= packages.NeedFiles
 	cfg.Tests = includeTests
 
 	pkgs, err := packages.Load(&cfg, patterns...)
@@ -106,6 +153,7 @@ func loadPackages(patterns []string, includeTests bool) ([]*packages.Package, er
 	// packages.Load() returns a weird GRAPH-IN-ARRAY which means in can contain duplicates
 	pkgMap := make(map[string]*packages.Package, len(pkgs))
 	for _, pkg := range pkgs {
+		fmt.Printf("pkg: %s\n", pkg.GoFiles)
 		pkgPath := pkg.PkgPath
 		pkgMap[pkgPath] = pkg
 	}
@@ -118,7 +166,7 @@ func loadPackages(patterns []string, includeTests bool) ([]*packages.Package, er
 	return pkgs, nil
 }
 
-func stubTypes(astFile *ast.File, f *os.File) error {
+func stubTypes(astFile *ast.File, f *bytes.Buffer, importedPackages []string) error {
 	for n, o := range astFile.Scope.Objects {
 		// if o.Kind == ast.Typ {
 		// check if type is exported(only need for non-local types)
@@ -130,13 +178,13 @@ func stubTypes(astFile *ast.File, f *os.File) error {
 			switch typeSpec.Type.(type) {
 			case *ast.StructType:
 				structType := typeSpec.Type.(*ast.StructType)
-				field := formatFieldsStruct(structType.Fields)
+				field := formatFieldsStruct(structType.Fields, importedPackages)
 				_, err := f.WriteString("type " + n + " struct " + "{" + field + "}\n\n")
 				if err != nil {
 					return err
 				}
 			default:
-				_, err := f.WriteString("type " + n + " " + formatType(typeSpec.Type) + "\n\n")
+				_, err := f.WriteString("type " + n + " " + formatTypeStruct(typeSpec.Type, importedPackages) + "\n\n")
 				if err != nil {
 					return err
 				}
@@ -149,7 +197,7 @@ func stubTypes(astFile *ast.File, f *os.File) error {
 	return nil
 }
 
-func stubFunctions(astFile *ast.File, outFile *os.File) error {
+func stubFunctions(astFile *ast.File, outFile *bytes.Buffer, importedPackages []string) error {
 	for _, xdecl := range astFile.Decls {
 		decl, ok := xdecl.(*ast.FuncDecl)
 		if !ok {
@@ -164,7 +212,7 @@ func stubFunctions(astFile *ast.File, outFile *os.File) error {
 			continue
 		}
 
-		foo := FormatFuncDecl("", decl)
+		foo := FormatFuncDecl("", decl, importedPackages)
 		foo += " {\n panic(\"stub\")\n}\n\n"
 		_, err := outFile.WriteString(foo)
 		if err != nil {

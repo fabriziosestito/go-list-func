@@ -1,4 +1,0 @@
-package 
-
-type Embedme interface{}
-
