@@ -20,7 +20,7 @@ var rootCmd = &cobra.Command{
 	Long: "todo: add long description",
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := gen.GenerateStubs(args, allowImports, generateGoMod)
+		err := gen.GenerateStubs(args, generateGoMod, allowImports)
 		if err != nil {
 			panic(err)
 		}
@@ -35,6 +35,6 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().StringArrayVarP(&allowImports, "allow-import", "a", nil, "Specify this flag multiple times to add external imports that will not be removed from the generated stubs.")
 	rootCmd.Flags().BoolVarP(&generateGoMod, "generate-go-mod", "m", false, "Generate the go.mod file in the root of the stub package.")
+	rootCmd.Flags().StringArrayVarP(&allowImports, "allow-import", "a", nil, "Specify this flag multiple times to add external imports that will not be removed from the generated stubs.")
 }

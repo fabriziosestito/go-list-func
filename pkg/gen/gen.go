@@ -20,7 +20,7 @@ type Import struct {
 	Path string
 }
 
-func GenerateStubs(patterns []string, allowImports []string, generateGoMod bool) error {
+func GenerateStubs(patterns []string, generateGoMod bool, allowImports []string) error {
 	pkgs, err := loadPackages(patterns)
 	if err != nil {
 		return err
