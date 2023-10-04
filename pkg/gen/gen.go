@@ -20,7 +20,7 @@ type Import struct {
 }
 
 func GenerateStubs(patterns []string) error {
-	pkgs, err := loadPackages(patterns, false)
+	pkgs, err := loadPackages(patterns)
 	if err != nil {
 		return err
 	}
@@ -139,12 +139,10 @@ func isLocalImport(importPath string, pkgs []*packages.Package) bool {
 }
 
 // loadPackages loads packages from patterns.
-func loadPackages(patterns []string, includeTests bool) ([]*packages.Package, error) {
+func loadPackages(patterns []string) ([]*packages.Package, error) {
 	var cfg packages.Config
 	cfg.Mode |= packages.NeedName
 	cfg.Mode |= packages.NeedSyntax
-	cfg.Mode |= packages.NeedFiles
-	cfg.Tests = includeTests
 
 	pkgs, err := packages.Load(&cfg, patterns...)
 	if err != nil {
@@ -208,8 +206,6 @@ func stubTypes(astFile *ast.File, f *bytes.Buffer, importedPackages []string) er
 				}
 			}
 		}
-		// }
-		// case *ast.InterfaceType:
 	}
 
 	return nil
