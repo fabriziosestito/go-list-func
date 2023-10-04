@@ -4,16 +4,27 @@ import (
 	"fmt"
 	"go/ast"
 	"os"
+	"path/filepath"
+	"strings"
 	"unicode"
 
+	jijjo "encoding/json"
+
+	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
 )
 
 func GenerateStubs(patterns []string) error {
+	_ = jijjo.Valid
 	pkgs, err := loadPackages(patterns, false)
 	if err != nil {
 		return err
 	}
+	modName, err := getModuleName(".")
+	if err != nil {
+		return err
+	}
+	println("mod: ", modName)
 
 	for _, pkg := range pkgs {
 		err := os.MkdirAll(pkg.PkgPath, 0755)
@@ -37,6 +48,19 @@ func GenerateStubs(patterns []string) error {
 		}
 
 		for _, astFile := range pkg.Syntax {
+			for _, o := range astFile.Imports {
+				for _, p := range pkgs {
+					// println("p.PkgPath: ", p.PkgPath)
+
+					// println("p.PkgPath: ", o.Path.Value)
+					if "\""+p.PkgPath+"\"" == o.Path.Value || !isThirdParty(o.Path.Value) {
+						if o.Name != nil {
+							println(o.Name.Name)
+						}
+						println(o.Path.Value)
+					}
+				}
+			}
 			err = stubTypes(astFile, outFile)
 			if err != nil {
 				return err
@@ -50,6 +74,21 @@ func GenerateStubs(patterns []string) error {
 	}
 
 	return nil
+}
+
+func isThirdParty(importPath string) bool {
+	// Third party package import path usually contains "." (".com", ".org", ...)
+	// This logic is taken from golang.org/x/tools/imports package.
+	return strings.Contains(importPath, ".")
+}
+
+func isLocalImport(importPath string, pkgs []*packages.Package) bool {
+	for _, pkg := range pkgs {
+		if pkg.PkgPath == importPath {
+			return true
+		}
+	}
+	return false
 }
 
 // loadPackages loads packages from patterns.
@@ -195,4 +234,23 @@ func getRecvName(decl *ast.FuncDecl) string {
 		// some new syntax?
 		panic(fmt.Errorf("unsupported receiver for %s: %#v", decl.Name.Name, decl.Recv))
 	}
+}
+
+// getModuleName returns the Go module name from the go.mod file in the given directory
+func getModuleName(dirPath string) (string, error) {
+	goModFilePath := filepath.Join(dirPath, "go.mod")
+
+	// Read the content of the go.mod file
+	data, err := os.ReadFile(goModFilePath)
+	if err != nil {
+		return "", err
+	}
+
+	// Use modfile.ModulePath to extract the module name
+	moduleName := modfile.ModulePath(data)
+	if moduleName == "" {
+		return "", fmt.Errorf("No module name found in go.mod")
+	}
+
+	return moduleName, nil
 }

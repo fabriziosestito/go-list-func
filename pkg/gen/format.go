@@ -52,7 +52,12 @@ func formatTypeStruct(typ interface{}) string {
 	case *ast.SelectorExpr:
 		return "interface{}"
 	case *ast.StarExpr:
-		return fmt.Sprintf("*%s", formatTypeStruct(t.X))
+		// is an external type
+		if _, ok := t.X.(*ast.SelectorExpr); ok {
+			return "interface{}"
+		} else {
+			return fmt.Sprintf("*%s", formatTypeStruct(t.X))
+		}
 	case *ast.ArrayType:
 		return fmt.Sprintf("[%s]%s", formatTypeStruct(t.Len), formatTypeStruct(t.Elt))
 	case *ast.Ellipsis:
@@ -90,7 +95,7 @@ func formatFields(fields *ast.FieldList) string {
 			}
 			s += " "
 		}
-		s += "interface{}"
+		s += formatTypeStruct(field.Type)
 		if i != len(fields.List)-1 {
 			s += ", "
 		}
@@ -101,8 +106,7 @@ func formatFields(fields *ast.FieldList) string {
 
 func formatFieldsStruct(fields *ast.FieldList) string {
 	s := ""
-	hasAlreadyEmbedded := false
-	hasNamedFields := false
+	// hasAlreadyEmbedded := false
 	for i, field := range fields.List {
 		for j, name := range field.Names {
 
@@ -112,16 +116,15 @@ func formatFieldsStruct(fields *ast.FieldList) string {
 			}
 			s += " "
 		}
-		if len(field.Names) == 0 {
-			if !hasAlreadyEmbedded {
-				s += "Embedme"
-				hasAlreadyEmbedded = true
-			}
-		} else {
-			hasNamedFields = true
-			s += formatTypeStruct(field.Type)
-		}
-		if i != len(fields.List)-1 && hasNamedFields {
+		// if len(field.Names) == 0 {
+		// 	if !hasAlreadyEmbedded {
+		// 		s += "Embedme"
+		// 		hasAlreadyEmbedded = true
+		// 	}
+		// } else {
+		s += formatTypeStruct(field.Type)
+		// }
+		if i != len(fields.List)-1 {
 			s += "; "
 		}
 	}
