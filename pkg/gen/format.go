@@ -20,7 +20,6 @@ func formatType(typ interface{}, importedPackages []string) string {
 		} else {
 			return "interface{}"
 		}
-		// return fmt.Sprintf("%s.%s", formatTypeStruct(t.X), t.Sel.Name)
 	case *ast.StarExpr:
 		// do not add * to interface{}
 		ft := formatType(t.X, importedPackages)
@@ -50,8 +49,10 @@ func formatType(typ interface{}, importedPackages []string) string {
 		return t.Value
 	case *ast.InterfaceType:
 		return "interface {}"
+	case *ast.StructType:
+		return "struct{}"
 	default:
-		return ""
+		return "interface{}"
 	}
 }
 
@@ -104,18 +105,20 @@ func formatFieldsStruct(fields *ast.FieldList, importedPackages []string) string
 
 func formatFuncResults(fields *ast.FieldList, importedPackages []string) string {
 	s := ""
+
+	// Add brackets anyway. The formatter will remove them if not needed.
+	// This is helpful to simplify the code in case of named return values.
 	if fields != nil {
-		s += " "
-		if len(fields.List) > 1 {
-			s += "("
-		}
+		s += " ("
 		s += formatFields(fields, importedPackages)
-		if len(fields.List) > 1 {
-			s += ")"
-		}
+		s += ")"
 	}
 
 	return s
+}
+
+func FuncWithGenerics[T1 any, T2 any](a T1) T1 {
+	return a
 }
 
 func FormatFuncDecl(decl *ast.FuncDecl, importedPackages []string) string {
@@ -133,7 +136,17 @@ func FormatFuncDecl(decl *ast.FuncDecl, importedPackages []string) string {
 		s += fmt.Sprintf("(%s %s) ", field.Names[0], formatType(field.Type, importedPackages))
 	}
 
-	s += fmt.Sprintf("%s(%s)", decl.Name.Name, formatFields(decl.Type.Params, importedPackages))
+	// generics
+	g := ""
+	if decl.Type.TypeParams != nil {
+		g += "["
+		for _, v := range decl.Type.TypeParams.List {
+			g += fmt.Sprintf("%s %s,", v.Names[0].Name, formatType(v.Type, importedPackages))
+		}
+		g += "]"
+	}
+
+	s += fmt.Sprintf("%s%s(%s)", decl.Name.Name, g, formatFields(decl.Type.Params, importedPackages))
 	s += formatFuncResults(decl.Type.Results, importedPackages)
 
 	return s

@@ -100,8 +100,6 @@ func GenerateStubs(patterns []string, generateGoMod bool, allowImports []string,
 			return (err)
 		}
 
-		// Programmatically use "goimports" on the generated file
-
 		// The file is created before since the imports.Process() function
 		// requires to know the file path.
 		outFile, err := os.Create(pkg.PkgPath + "/" + pkg.Name + ".go")
@@ -109,7 +107,11 @@ func GenerateStubs(patterns []string, generateGoMod bool, allowImports []string,
 			return err
 		}
 
-		res, _ := imports.Process(outFile.Name(), buf.Bytes(), nil)
+		// Programmatically use "goimports"
+		res, err := imports.Process(outFile.Name(), buf.Bytes(), nil)
+		if err != nil {
+			return err
+		}
 
 		_, err = outFile.Write(res)
 		if err != nil {
@@ -168,9 +170,8 @@ func loadPackages(patterns []string) ([]*packages.Package, error) {
 
 func stubTypes(astFile *ast.File, f *bytes.Buffer, importedPackages []string) error {
 	for n, o := range astFile.Scope.Objects {
-		// if o.Kind == ast.Typ {
-		// check if type is exported(only need for non-local types)
-		// if unicode.IsUpper([]rune(n)[0]) {
+		// private types are create too
+		// this is needed for private embedded types in structs
 		node := o.Decl
 		switch ts := node.(type) {
 		case *ast.TypeSpec:
@@ -226,7 +227,7 @@ func stubFunctions(astFile *ast.File, outFile *bytes.Buffer, pkgName string, fun
 		foo := FormatFuncDecl(decl, importedPackages)
 
 		// check if function body is provided
-		key := fmt.Sprintf("%s.%s", pkgName, decl.Name.Name)
+		key := fmt.Sprintf("%s%s.%s", pkgName, getRecvType(decl), decl.Name.Name)
 		if body, ok := functionsBodies[key]; ok {
 			foo += "{" + body + "\n}\n\n"
 		} else {
@@ -296,6 +297,34 @@ func getRecvName(decl *ast.FuncDecl) string {
 			panic(fmt.Errorf("unsupported receiver for %s: %#v", decl.Name.Name, decl.Recv))
 		}
 
+	default:
+		// some new syntax?
+		panic(fmt.Errorf("unsupported receiver for %s: %#v", decl.Name.Name, decl.Recv))
+	}
+}
+
+func getRecvType(decl *ast.FuncDecl) string {
+	if decl.Recv == nil {
+		return ""
+	}
+
+	if len(decl.Recv.List) != 1 {
+		panic(fmt.Errorf("multiple receivers for %s: %#v", decl.Name.Name, decl.Recv))
+	}
+
+	field := decl.Recv.List[0]
+
+	switch t := field.Type.(type) {
+	case *ast.Ident:
+		return fmt.Sprintf(".(%s)", t.Name)
+	case *ast.StarExpr:
+		switch xType := t.X.(type) {
+		case *ast.Ident:
+			return fmt.Sprintf(".(*%s)", xType.Name)
+		default:
+			// not an identificator?
+			panic(fmt.Errorf("unsupported receiver for %s: %#v", decl.Name.Name, decl.Recv))
+		}
 	default:
 		// some new syntax?
 		panic(fmt.Errorf("unsupported receiver for %s: %#v", decl.Name.Name, decl.Recv))
