@@ -15,18 +15,17 @@ import (
 	"golang.org/x/tools/imports"
 )
 
-type Import struct {
-	Name string
-	Path string
-}
+func GenerateStubs(patterns []string, generateGoMod bool, allowImports []string, functionsBodies map[string]string) error {
+	if generateGoMod {
+		_, err := getModuleName(".")
+		if err != nil {
+			return err
+		}
 
-func GenerateStubs(patterns []string, generateGoMod bool, allowImports []string) error {
-	pkgs, err := loadPackages(patterns)
-	if err != nil {
-		return err
+		// TODO: generate go.mod file
 	}
 
-	_, err = getModuleName(".")
+	pkgs, err := loadPackages(patterns)
 	if err != nil {
 		return err
 	}
@@ -89,7 +88,7 @@ func GenerateStubs(patterns []string, generateGoMod bool, allowImports []string)
 				return err
 			}
 
-			err = stubFunctions(astFile, buf, importedPackages)
+			err = stubFunctions(astFile, buf, pkg.Name, functionsBodies, importedPackages)
 			if err != nil {
 				return err
 			}
@@ -198,7 +197,7 @@ func stubTypes(astFile *ast.File, f *bytes.Buffer, importedPackages []string) er
 					return err
 				}
 			default:
-				_, err := f.WriteString("type " + n + " " + formatTypeStruct(ts.Type, importedPackages) + "\n\n")
+				_, err := f.WriteString("type " + n + " " + formatType(ts.Type, importedPackages) + "\n\n")
 				if err != nil {
 					return err
 				}
@@ -209,7 +208,7 @@ func stubTypes(astFile *ast.File, f *bytes.Buffer, importedPackages []string) er
 	return nil
 }
 
-func stubFunctions(astFile *ast.File, outFile *bytes.Buffer, importedPackages []string) error {
+func stubFunctions(astFile *ast.File, outFile *bytes.Buffer, pkgName string, functionsBodies map[string]string, importedPackages []string) error {
 	for _, xdecl := range astFile.Decls {
 		decl, ok := xdecl.(*ast.FuncDecl)
 		if !ok {
@@ -225,7 +224,14 @@ func stubFunctions(astFile *ast.File, outFile *bytes.Buffer, importedPackages []
 		}
 
 		foo := FormatFuncDecl(decl, importedPackages)
-		foo += " {\n panic(\"stub\")\n}\n\n"
+
+		// check if function body is provided
+		key := fmt.Sprintf("%s.%s", pkgName, decl.Name.Name)
+		if body, ok := functionsBodies[key]; ok {
+			foo += "{" + body + "\n}\n\n"
+		} else {
+			foo += " {\n panic(\"stub\")\n}\n\n"
+		}
 		_, err := outFile.WriteString(foo)
 		if err != nil {
 			return err
