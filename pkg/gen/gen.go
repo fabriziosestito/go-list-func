@@ -16,12 +16,34 @@ import (
 
 func GenerateStubs(patterns []string, generateGoMod bool, allowImports []string, functionsBodies map[string]string) error {
 	if generateGoMod {
-		_, err := getModuleName(".")
+		goModFile, err := os.ReadFile("./go.mod")
 		if err != nil {
 			return err
 		}
 
-		// TODO: generate go.mod file
+		goMod, err := modfile.Parse("./go.mod", goModFile, nil)
+		if err != nil {
+			return err
+		}
+		err = os.MkdirAll(goMod.Module.Mod.Path, 0755)
+		if err != nil {
+			return err
+		}
+
+		genGoModFile, err := os.Create(filepath.Join(goMod.Module.Mod.Path, "go.mod"))
+		if err != nil {
+			return err
+		}
+
+		_, err = genGoModFile.WriteString("module " + goMod.Module.Mod.Path + "\n\n")
+		if err != nil {
+			return err
+		}
+
+		_, err = genGoModFile.WriteString("go " + goMod.Go.Version + "\n")
+		if err != nil {
+			return err
+		}
 	}
 
 	pkgs, err := loadPackages(patterns)
@@ -45,6 +67,10 @@ func GenerateStubs(patterns []string, generateGoMod bool, allowImports []string,
 		// A the end we will programmatically use "goimports" on the generated file to fix the imports
 		importedPackagesSet := make(map[string]struct{})
 		for _, astFile := range pkg.Syntax {
+			if ast.IsGenerated(astFile) {
+				continue
+			}
+
 			for _, o := range astFile.Imports {
 				if isThirdParty(o.Path.Value, allowImports) && !isLocalImport(o.Path.Value, pkgs) {
 					continue
@@ -82,6 +108,10 @@ func GenerateStubs(patterns []string, generateGoMod bool, allowImports []string,
 		}
 
 		for _, astFile := range pkg.Syntax {
+			if ast.IsGenerated(astFile) {
+				continue
+			}
+
 			err = stubTypes(astFile, buf, importedPackages)
 			if err != nil {
 				return err
@@ -272,23 +302,4 @@ func getRecvType(decl *ast.FuncDecl) string {
 		// some new syntax?
 		panic(fmt.Errorf("unsupported receiver for %s: %#v", decl.Name.Name, decl.Recv))
 	}
-}
-
-// getModuleName returns the Go module name from the go.mod file in the given directory
-func getModuleName(dirPath string) (string, error) {
-	goModFilePath := filepath.Join(dirPath, "go.mod")
-
-	// Read the content of the go.mod file
-	data, err := os.ReadFile(goModFilePath)
-	if err != nil {
-		return "", err
-	}
-
-	// Use modfile.ModulePath to extract the module name
-	moduleName := modfile.ModulePath(data)
-	if moduleName == "" {
-		return "", fmt.Errorf("No module name found in go.mod")
-	}
-
-	return moduleName, nil
 }
