@@ -75,24 +75,26 @@ func formatFields(fields *ast.FieldList, importedPackages []string) string {
 	return s
 }
 
-func formatFieldsStruct(fields *ast.FieldList, importedPackages []string) string {
+// formatStructFields formats the fields of a struct.
+func formatStructFields(fields *ast.FieldList, importedPackages []string) string {
 	s := ""
 	for i, field := range fields.List {
 		for j, name := range field.Names {
-
 			s += name.Name
 			if j != len(field.Names)-1 {
 				s += ";"
 			}
 			s += " "
 		}
-
 		ft := formatType(field.Type, importedPackages)
 
+		// quick and dirty, if formatType returns an interface{} it means
+		// that the field is an embedded struct of an external package
+		// We replace it with Embedme to make the code compilable.
 		if ft == "interface{}" && len(field.Names) == 0 {
 			s += "Embedme"
 		} else {
-			s += formatType(field.Type, importedPackages)
+			s += ft
 		}
 
 		if i != len(fields.List)-1 {
@@ -109,19 +111,13 @@ func formatFuncResults(fields *ast.FieldList, importedPackages []string) string 
 	// Add brackets anyway. The formatter will remove them if not needed.
 	// This is helpful to simplify the code in case of named return values.
 	if fields != nil {
-		s += " ("
-		s += formatFields(fields, importedPackages)
-		s += ")"
+		s = fmt.Sprintf("(%s)", formatFields(fields, importedPackages))
 	}
 
 	return s
 }
 
-func FuncWithGenerics[T1 any, T2 any](a T1) T1 {
-	return a
-}
-
-func FormatFuncDecl(decl *ast.FuncDecl, importedPackages []string) string {
+func formatFuncDecl(decl *ast.FuncDecl, importedPackages []string) string {
 	s := "func "
 
 	if decl.Recv != nil {

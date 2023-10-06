@@ -7,3 +7,8 @@ go-stub-package: $(SOURCE_FILES) go.mod go.sum
 test:
 	go test -v ./...
 
+.PHONY: lint
+lint:
+	golangci-lint run
+
+
